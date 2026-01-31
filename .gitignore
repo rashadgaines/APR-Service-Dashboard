@@ -49,6 +49,10 @@ prisma/*.db-journal
 
 # Internal documentation (not for repo)
 PRODUCTION_PUSH.md
+README_OLD.md
+FINAL_SUMMARY.md
+DEPLOYMENT.md
+DEMO_READY.md
 INTERNAL*.md
 NOTES*.md
 TODO*.md
@@ -59,6 +63,9 @@ diagnose.sh
 fix-services.sh
 minimal-test.sh
 start-services-manual.sh
+
+# Demo artifacts
+demo.html
 
 # Secrets and credentials
 *.pem
