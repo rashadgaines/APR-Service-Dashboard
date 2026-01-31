@@ -78,16 +78,20 @@ app.use('*', (req, res) => {
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Initialize wallet for real on-chain transactions (required)
+// Initialize wallet for real on-chain transactions (only required when enabled)
 const walletInitialized = initializeWallet();
-if (!walletInitialized) {
+if (env.REIMBURSEMENT_ENABLED && !walletInitialized) {
   logger.error('❌ FATAL: Wallet initialization failed - PRIVATE_KEY must be set and valid');
   logger.error('❌ On-chain reimbursements require a funded Polygon wallet');
   process.exit(1);
 }
 
-logger.info(`✅ Wallet initialized: ${getSignerAddress()}`);
-logger.info('✅ Real on-chain reimbursements ENABLED - all transactions are live');
+if (walletInitialized) {
+  logger.info(`✅ Wallet initialized: ${getSignerAddress()}`);
+  logger.info('✅ Real on-chain reimbursements ENABLED - all transactions are live');
+} else {
+  logger.warn('⚠️ Wallet not initialized - reimbursements disabled (set PRIVATE_KEY to enable)');
+}
 
 // Start server
 const server = app.listen(API_CONFIG.PORT, () => {

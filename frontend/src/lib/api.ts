@@ -1,4 +1,7 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003/api';
+import { getMockResponse } from '@/lib/mockData';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA !== 'false' && process.env.NODE_ENV === 'development';
 const API_TIMEOUT_MS = 8000; // Reduced from 30s to fail faster if backend is down
 const HEALTH_CHECK_TIMEOUT = 3000; // Quick check if backend is alive
 
@@ -12,6 +15,7 @@ class ApiClient {
   }
 
   private async checkHealth(): Promise<boolean> {
+    if (USE_MOCK_DATA) return true;
     const now = Date.now();
     // Cache health check for 5 seconds
     if (now - this.lastHealthCheck < 5000) {
@@ -35,6 +39,10 @@ class ApiClient {
   }
 
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    if (USE_MOCK_DATA) {
+      const mock = getMockResponse(endpoint);
+      if (mock) return mock as T;
+    }
     const url = `${this.baseURL}${endpoint}`;
     
     // Quick health check to avoid resource exhaustion
