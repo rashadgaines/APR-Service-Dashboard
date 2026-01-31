@@ -1,0 +1,28 @@
+{
+  "name": "gondor-apr-service",
+  "version": "1.0.0",
+  "description": "APR cap enforcement service for Morpho lending pools",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
+    "test": "npm run test --workspace=backend && npm run test --workspace=frontend",
+    "lint": "npm run lint --workspace=backend && npm run lint --workspace=frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "keywords": [
+    "defi",
+    "morpho",
+    "apr",
+    "polygon",
+    "blockchain"
+  ],
+  "author": "",
+  "license": "MIT"
+}

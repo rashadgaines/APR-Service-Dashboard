@@ -1,0 +1,137 @@
+// Prisma schema for Gondor APR Service
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Market {
+  id              String   @id @default(cuid())
+  marketId        String   @unique @map("market_id")
+  vaultAddress    String   @map("vault_address")
+  name            String
+  collateralAsset String   @map("collateral_asset")
+  loanAsset       String   @map("loan_asset")
+  lltv            Decimal  @db.Decimal(10, 4)
+  aprCap          Decimal  @map("apr_cap") @db.Decimal(10, 4)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  positions      Position[]
+  dailySnapshots DailySnapshot[]
+
+  @@map("markets")
+}
+
+model Borrower {
+  id        String   @id @default(cuid())
+  address   String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  positions Position[]
+
+  @@map("borrowers")
+}
+
+model Position {
+  id         String    @id @default(cuid())
+  borrowerId String    @map("borrower_id")
+  marketId   String    @map("market_id")
+  principal  Decimal   @db.Decimal(78, 0)
+  collateral Decimal   @db.Decimal(78, 0)
+  isActive   Boolean   @default(true) @map("is_active")
+  openedAt   DateTime  @map("opened_at")
+  closedAt   DateTime? @map("closed_at")
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  borrower         Borrower          @relation(fields: [borrowerId], references: [id], onDelete: Cascade)
+  market           Market            @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  interestAccruals InterestAccrual[]
+  reimbursements   Reimbursement[]
+
+  @@index([borrowerId])
+  @@index([marketId])
+  @@index([isActive])
+  @@index([borrowerId, marketId, isActive])
+  @@map("positions")
+}
+
+model InterestAccrual {
+  id          String   @id @default(cuid())
+  positionId  String   @map("position_id")
+  date        DateTime @db.Date
+  accruedAmt  Decimal  @map("accrued_amt") @db.Decimal(78, 0)
+  actualApr   Decimal  @map("actual_apr") @db.Decimal(10, 4)
+  cappedApr   Decimal  @map("capped_apr") @db.Decimal(10, 4)
+  excessAmt   Decimal  @map("excess_amt") @db.Decimal(78, 0)
+
+  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@unique([positionId, date])
+  @@index([positionId])
+  @@index([date])
+  @@map("interest_accruals")
+}
+
+model Reimbursement {
+  id         String   @id @default(cuid())
+  positionId String   @map("position_id")
+  date       DateTime @db.Date
+  amount     Decimal  @db.Decimal(78, 0)
+  txHash     String?  @map("tx_hash")
+  status     String   @default("pending") // pending, processed, failed
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@index([positionId])
+  @@index([date])
+  @@index([status])
+  @@index([date, status])
+  @@map("reimbursements")
+}
+
+model DailySnapshot {
+  id             String   @id @default(cuid())
+  marketId       String   @map("market_id")
+  date           DateTime @db.Date
+  totalBorrowed  Decimal  @map("total_borrowed") @db.Decimal(78, 0)
+  avgApr         Decimal  @map("avg_apr") @db.Decimal(10, 4)
+  borrowerCount  Int      @map("borrower_count")
+  aboveCapCount  Int      @map("above_cap_count")
+
+  market Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  @@unique([marketId, date])
+  @@index([marketId])
+  @@index([date])
+  @@map("daily_snapshots")
+}
+
+model Alert {
+  id              String    @id @default(cuid())
+  type            String    // HIGH_APR, ELEVATED_APR, LARGE_REIMBURSEMENT, etc.
+  severity        String    // critical, warning, info
+  message         String
+  marketId        String?   @map("market_id")
+  marketName      String?   @map("market_name")
+  borrowerAddress String?   @map("borrower_address")
+  metadata        Json?     // Additional context (APR values, amounts, etc.)
+  acknowledged    Boolean   @default(false)
+  acknowledgedAt  DateTime? @map("acknowledged_at")
+  acknowledgedBy  String?   @map("acknowledged_by")
+  resolvedAt      DateTime? @map("resolved_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@index([type])
+  @@index([severity])
+  @@index([acknowledged])
+  @@index([createdAt])
+  @@index([marketId])
+  @@map("alerts")
+}

@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 96%;
+    /* #F5F5F7 Cream/Off-white */
+    --foreground: 219 38% 28%;
+    /* #2D4164 Deep Navy */
+    --card: 240 10% 97%;
+    --card-foreground: 219 38% 28%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 219 38% 28%;
+    --primary: 219 38% 28%;
+    /* Deep Navy */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 214 15% 98%;
+    /* #F7F9FA Soft blue-grey */
+    --secondary-foreground: 219 38% 28%;
+    --muted: 214 15% 98%;
+    --muted-foreground: 219 20% 45%;
+    --accent: 214 15% 98%;
+    --accent-foreground: 219 38% 28%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 219 20% 90%;
+    --input: 219 20% 90%;
+    --ring: 219 38% 28%;
+    --radius: 100px;
+    /* Pill shape */
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground selection:bg-primary/10;
+    background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-attachment: fixed;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .arch-line-v {
+    @apply w-[1px] bg-primary/20 h-10;
+  }
+
+  .arch-line-h {
+    @apply h-[1px] bg-primary/20 w-10;
+  }
+}

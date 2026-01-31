@@ -1,0 +1,85 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Environment files (NEVER commit these)
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# IDE and AI tools
+.idea/
+.vscode/
+.claude/
+.grok/
+.cursor/
+.copilot/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+prisma/*.db
+prisma/*.db-journal
+
+# Internal documentation (not for repo)
+PRODUCTION_PUSH.md
+INTERNAL*.md
+NOTES*.md
+TODO*.md
+PRIVATE*.md
+
+# Local dev/debug scripts
+diagnose.sh
+fix-services.sh
+minimal-test.sh
+start-services-manual.sh
+test-*.sh
+test-*.js
+demo.html
+
+# Secrets and credentials
+*.pem
+*.key
+*.crt
+*.p12
+credentials.json
+secrets.json
+service-account*.json
+
+# Misc
+.cache/
+*.tsbuildinfo
+.turbo/
+.vercel/
+.netlify/
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
