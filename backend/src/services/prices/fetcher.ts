@@ -94,6 +94,10 @@ export async function fetchTokenPrices(tokenSymbols: string[]): Promise<Record<s
         const price = data[geckoId].usd;
         freshPrices[symbol] = price;
         priceCache[symbol] = { price, timestamp: now };
+      } else {
+        // Use fallback if API didn't return price for this token
+        logger.warn(`No price data for ${symbol}, using fallback`);
+        freshPrices[symbol] = FALLBACK_PRICES[symbol] || 1;
       }
     }
 

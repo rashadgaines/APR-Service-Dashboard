@@ -263,19 +263,33 @@ function refreshCacheIfNeeded() {
  * Returns system-wide metrics for the dashboard (cached)
  */
 router.get('/overview', asyncHandler(async (_req: Request, res: Response) => {
-  // Refresh cache in background if needed
-  refreshCacheIfNeeded();
-  
-  // Return cached data immediately
-  if (metricsCache.overview) {
-    return res.json(metricsCache.overview);
+  try {
+    // Refresh cache in background if needed
+    refreshCacheIfNeeded();
+    
+    // Return cached data immediately
+    if (metricsCache.overview) {
+      return res.json(metricsCache.overview);
+    }
+    
+    // On first request, compute immediately
+    const overview = await computeOverviewMetrics();
+    metricsCache.overview = overview;
+    metricsCache.lastUpdate = Date.now();
+    res.json(overview);
+  } catch (error) {
+    logger.error('Error in overview metrics endpoint:', error);
+    res.json({
+      totalBorrowers: 0,
+      activeBorrowers: 0,
+      borrowersUnderCap: 0,
+      borrowersAboveCap: 0,
+      totalValueLocked: "0.00",
+      todayReimbursements: "0.00",
+      totalReimbursements: "0.00",
+      _error: 'Metrics temporarily unavailable'
+    });
   }
-  
-  // On first request, compute immediately
-  const overview = await computeOverviewMetrics();
-  metricsCache.overview = overview;
-  metricsCache.lastUpdate = Date.now();
-  res.json(overview);
 }));
 
 /**
@@ -283,19 +297,27 @@ router.get('/overview', asyncHandler(async (_req: Request, res: Response) => {
  * Returns daily reimbursement data for charting (cached)
  */
 router.get('/daily', asyncHandler(async (req: Request, res: Response) => {
-  // Refresh cache in background if needed
-  refreshCacheIfNeeded();
-  
-  // Return cached data immediately
-  if (metricsCache.daily) {
-    return res.json(metricsCache.daily);
+  try {
+    // Refresh cache in background if needed
+    refreshCacheIfNeeded();
+    
+    // Return cached data immediately
+    if (metricsCache.daily) {
+      return res.json(metricsCache.daily);
+    }
+    
+    // On first request, compute immediately
+    const daily = await computeDailyMetrics();
+    metricsCache.daily = daily;
+    metricsCache.lastUpdate = Date.now();
+    res.json(daily);
+  } catch (error) {
+    logger.error('Error in daily metrics endpoint:', error);
+    res.json({ 
+      data: [],
+      _error: 'Daily metrics temporarily unavailable'
+    });
   }
-  
-  // On first request, compute immediately
-  const daily = await computeDailyMetrics();
-  metricsCache.daily = daily;
-  metricsCache.lastUpdate = Date.now();
-  res.json(daily);
 }));
 
 /**
@@ -303,19 +325,27 @@ router.get('/daily', asyncHandler(async (req: Request, res: Response) => {
  * Returns market-level metrics (cached)
  */
 router.get('/markets', asyncHandler(async (_req: Request, res: Response) => {
-  // Refresh cache in background if needed
-  refreshCacheIfNeeded();
-  
-  // Return cached data immediately
-  if (metricsCache.markets) {
-    return res.json(metricsCache.markets);
+  try {
+    // Refresh cache in background if needed
+    refreshCacheIfNeeded();
+    
+    // Return cached data immediately
+    if (metricsCache.markets) {
+      return res.json(metricsCache.markets);
+    }
+    
+    // On first request, compute immediately
+    const markets = await computeMarketMetrics();
+    metricsCache.markets = markets;
+    metricsCache.lastUpdate = Date.now();
+    res.json(markets);
+  } catch (error) {
+    logger.error('Error in markets metrics endpoint:', error);
+    res.json({ 
+      markets: [],
+      _error: 'Market metrics temporarily unavailable'
+    });
   }
-  
-  // On first request, compute immediately
-  const markets = await computeMarketMetrics();
-  metricsCache.markets = markets;
-  metricsCache.lastUpdate = Date.now();
-  res.json(markets);
 }));
 
 export default router;

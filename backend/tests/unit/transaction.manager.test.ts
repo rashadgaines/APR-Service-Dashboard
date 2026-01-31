@@ -70,6 +70,8 @@ describe('Transaction Manager', () => {
       gasUsed: 55000n,
       effectiveGasPrice: 30000000000n,
     });
+    // Mock sufficient balance by default
+    mockReadContract.mockResolvedValue(10000000000000000000n); // 10 tokens
   });
 
   describe('executeTokenTransfer', () => {
@@ -114,13 +116,15 @@ describe('Transaction Manager', () => {
     });
 
     it('stops retrying on insufficient funds error', async () => {
-      mockSendTransaction.mockRejectedValue(new Error('insufficient funds for gas'));
-
+      // Mock insufficient balance
+      mockReadContract.mockResolvedValue(0n);
+      
       const result = await executeTokenTransfer(transferParams);
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('insufficient funds');
-      expect(mockSendTransaction).toHaveBeenCalledTimes(1);
+      expect(result.error).toContain('Insufficient balance');
+      // Should not call sendTransaction if balance check fails
+      expect(mockSendTransaction).toHaveBeenCalledTimes(0);
     });
 
     it('includes gas buffer in transaction', async () => {

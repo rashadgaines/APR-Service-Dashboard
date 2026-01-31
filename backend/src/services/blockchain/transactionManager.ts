@@ -48,6 +48,43 @@ export async function executeTokenTransfer(params: TransferParams): Promise<Tran
     };
   }
 
+  // Validate recipient address
+  if (!recipientAddress || recipientAddress === '0x0000000000000000000000000000000000000000') {
+    return {
+      success: false,
+      hash: null,
+      receipt: null,
+      error: 'Invalid recipient address',
+    };
+  }
+
+  // Validate amount
+  if (amount <= 0n) {
+    return {
+      success: false,
+      hash: null,
+      receipt: null,
+      error: 'Transfer amount must be greater than zero',
+    };
+  }
+
+  // Check balance before attempting transfer
+  try {
+    const { sufficient, balance } = await hasSufficientBalance(tokenAddress, amount);
+    if (!sufficient) {
+      logger.error(`Insufficient token balance: have ${balance}, need ${amount}`);
+      return {
+        success: false,
+        hash: null,
+        receipt: null,
+        error: `Insufficient balance: have ${balance}, need ${amount}`,
+      };
+    }
+  } catch (error) {
+    logger.warn('Could not verify balance before transfer:', error);
+    // Continue anyway - the actual transaction will fail if insufficient
+  }
+
   const walletClient = getWalletClient();
   const publicClient = getPublicClient();
 

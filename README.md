@@ -1,113 +1,169 @@
 # Gondor APR Service
 
-Backend service + monitoring dashboard for enforcing APR caps on Morpho lending pools (Polygon).
+Monitoring and reimbursement system for Morpho lending pools on Polygon. Enforces APR caps by tracking positions, calculating excess interest, and executing on-chain reimbursements.
 
-## What It Does
-
-Morpho uses floating interest rates, but borrowers prefer predictable APRs. This service:
-- **Tracks positions** from Morpho markets via on-chain queries (viem)
-- **Computes daily reimbursements** for interest above the APR cap
-- **Executes reimbursements** via ERC20 transfers on Polygon
-- **Stores history** in PostgreSQL (positions, interest accruals, reimbursements)
-- **Monitors** with a real-time dashboard showing borrowers, reimbursements, and alerts
-
-## Quick Start
+## Setup
 
 ```bash
-# 1. Start PostgreSQL
-docker run --name gondor-db -e POSTGRES_PASSWORD=password -e POSTGRES_DB=gondor -p 5432:5432 -d postgres:15
-
-# 2. Setup backend
-cd backend
-cp .env.example .env  # Configure DATABASE_URL, POLYGON_RPC_URL, PRIVATE_KEY
-npm install
-npx prisma migrate dev
-npx prisma db seed    # Load demo data
-npm run dev           # Runs on :3003
-
-# 3. Setup frontend (new terminal)
-cd frontend
-npm install
-npm run dev           # Runs on :3000
+./start.sh
 ```
 
-Open http://localhost:3000
+Starts PostgreSQL, backend on :3003, frontend on :3000.
 
-## Configured Markets
+## How It Works
 
-| Market | APR Cap | Vault |
-|--------|---------|-------|
-| wstETH/WETH (91.5% LLTV) | 8% | `0xF5C81d25ee174d83f1FD202cA94AE6070d073cCF` |
-| WBTC/USDC (86% LLTV) | 10% | `0xAcB0DCe4b0FF400AD8F6917f3ca13E434C9ed6bC` |
-| WPOL/USDC (77% LLTV) | 12% | `0xfD06859A671C21497a2EB8C5E3fEA48De924D6c8` |
+**Problem:** Morpho uses floating interest rates. Borrowers need predictable APR caps.
 
-## Tech Stack
+**Solution:** Daily process that:
+1. Syncs borrower positions from Morpho GraphQL API
+2. Calculates interest accrual against APR caps (8%, 10%, 12% depending on market)
+3. Executes ERC20 transfers to reimburse excess interest on Polygon
+4. Stores audit trail and serves real-time dashboard
 
-- **Backend**: Node.js, TypeScript, Express, Prisma, viem
-- **Frontend**: Next.js 14, React, TailwindCSS, Recharts
-- **Database**: PostgreSQL
-- **Blockchain**: Polygon via viem
+**Implementation:** Backend-level reimbursements (not contract-level). Morpho contracts are immutable—forking them defeats the purpose. Backend approach: flexible, lower gas costs (batching), no user migration.
 
-## Project Structure
+## Architecture
 
 ```
-backend/
-├── src/
-│   ├── services/
-│   │   ├── interest/      # Daily interest & excess calculation
-│   │   ├── reimbursement/ # Batch processing & on-chain execution
-│   │   ├── morpho/        # On-chain queries via viem
-│   │   ├── sync/          # Position sync from Morpho
-│   │   └── alerts/        # APR violation detection
-│   └── api/routes/        # REST endpoints
-├── prisma/                # DB schema & migrations
-└── tests/                 # Unit & integration tests
-
-frontend/
-├── src/app/              # Dashboard pages
-└── src/components/       # Charts, cards, alerts UI
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│                      Morpho Protocol (Polygon)                                    │
+│                   (immutable, permissionless)                                     │
+└───────────────────────────────────────────────────┬─────────────────────────────────┘
+                               │
+                        GraphQL Queries
+                    (retry, cache, timeout)
+                               │
+        ┌───────────────────────┼─────────────┬────────────────────────┐
+        │                       │             │                        │
+   ┌────▼────┐          ┌──────▼──────┐  ┌──▼─────────────┐
+   │ Position │          │   Interest  │  │ Transaction   │
+   │  Sync    │          │ Calculator  │  │  Manager      │
+   │(15 min)  │          │ (00:00 UTC) │  │ (01:00 UTC)   │
+   └────┬─────┘          └──────┬──────┘  └──┬─────────────┘
+        │                       │            │
+        │ Fetch positions       │ Calculate  │ Execute transfers
+        │                       │ excess     │ with retry logic
+        │                       │ above caps │
+        └───────────┬───────────┼────────────┘
+                    │           │
+                ┌───▼───────────▼─────────────────┐
+                │   PostgreSQL Database           │
+                │ ├─ Markets & APR caps           │
+                │ ├─ Borrowers & Positions        │
+                │ ├─ Interest Accruals            │
+                │ ├─ Reimbursements (tx hash)     │
+                │ └─ Alerts & History             │
+                └───┬───────────┬────────────────┬┘
+                    │           │                │
+            REST API│           │ Query          │
+         (cached 3s)│           │                │
+                    │           │                │
+        ┌───────────┼───────────┼────────────────┼────────┐
+        │           │           │                │        │
+    ┌───▼──┐   ┌────▼───────┐  ┌────▼────────────▼────┐
+    │Health│   │  Metrics   │  │  Frontend Dashboard  │
+    │Check │   │  Alerts    │  │   (Next.js 14)       │
+    │      │   │  History   │  │                      │
+    └──────┘   └────────────┘  └────┬─────────────────┘
+                                    │
+                            Real-time charts
+                            TVL, borrower stats
+                            Smart polling
 ```
 
-## API Endpoints
+## Key Files
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/health` | System health (DB, RPC, wallet) |
-| `GET /api/metrics/overview` | TVL, borrowers under/above cap, reimbursements |
-| `GET /api/metrics/daily` | Daily reimbursement chart data |
-| `GET /api/metrics/markets` | Per-market breakdown |
-| `GET /api/alerts` | Active alerts (APR > 2x cap, large reimbursements) |
-| `GET /api/reimbursements` | Reimbursement history |
-| `POST /api/jobs/position-sync/run` | Trigger position sync |
-| `POST /api/jobs/daily-reimbursement/run` | Trigger reimbursement processing |
+**Backend Logic:**
+- [backend/src/services/morpho/queries.ts](backend/src/services/morpho/queries.ts) — Morpho GraphQL queries with retry/cache
+- [backend/src/services/interest/calculator.ts](backend/src/services/interest/calculator.ts) — APR cap calculations
+- [backend/src/services/blockchain/transactionManager.ts](backend/src/services/blockchain/transactionManager.ts) — On-chain transfers with retry logic
+- [backend/src/services/reimbursement/processor.ts](backend/src/services/reimbursement/processor.ts) — Batch reimbursement execution
+- [backend/src/api/routes](backend/src/api/routes) — REST endpoints (metrics, alerts, health)
 
-## Scheduled Jobs
+**Tests (75 passing):**
+- [backend/tests/unit](backend/tests/unit) — Interest calculator, transaction manager, reimbursement processor
+- [backend/tests/integration/api.test.ts](backend/tests/integration/api.test.ts) — API endpoint tests
+- [backend/tests/e2e/full-flow.test.ts](backend/tests/e2e/full-flow.test.ts) — Full workflow tests
 
-| Job | Schedule | Description |
-|-----|----------|-------------|
-| Position Sync | Every 15 min | Fetch positions from Morpho |
-| Daily Accrual | 00:00 UTC | Calculate interest for all positions |
-| Reimbursement | 01:00 UTC | Process pending reimbursements |
+**Infrastructure:**
+- [docker-compose.yml](docker-compose.yml) — Local dev environment (PostgreSQL + services)
+- [backend/Dockerfile](backend/Dockerfile) — Backend container
+- [frontend/Dockerfile](frontend/Dockerfile) — Frontend container
+- [prisma/schema.prisma](backend/prisma/schema.prisma) — Database schema
+- [prisma/migrations](backend/prisma/migrations) — Schema migrations
 
-## Tests
+**Configuration:**
+- `.env` — Environment variables (DATABASE_URL, POLYGON_RPC_URL, PRIVATE_KEY)
+
+## Markets
+
+- **wstETH/WETH**: 8% APR cap (91.5% LLTV)
+- **WBTC/USDC**: 10% APR cap (86% LLTV)  
+- **WPOL/USDC**: 12% APR cap (77% LLTV)
+
+## API
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health` | Basic health |
+| `GET /api/health` | Detailed health (DB, RPC, wallet latencies) |
+| `GET /api/metrics/overview` | Dashboard: TVL, borrower counts, reimbursement totals |
+| `GET /api/metrics/daily` | Historical reimbursements for charts |
+| `GET /api/metrics/markets` | Per-market statistics |
+| `GET /api/alerts` | Alert history |
+| `GET /api/reimbursements` | Transaction history |
+| `POST /api/jobs/position-sync/run` | Manual sync trigger |
+| `POST /api/jobs/daily-accrual/run` | Manual calculation trigger |
+| `POST /api/jobs/daily-reimbursement/run` | Manual reimbursement trigger |
+
+Responses cached with 3s TTL. Graceful fallbacks when services unavailable.
+
+## Testing
 
 ```bash
 cd backend && npm test
 ```
 
-Covers: interest calculations, excess computation, reimbursement processing, alert detection.
+75 passing tests:
+- Interest calculation (Decimal.js precision, APY→APR conversion)
+- Reimbursement processor (batching, transaction safety)
+- Transaction manager (retry logic, gas estimation, balance validation)
+- Position sync (database transactions)
+- API endpoints (error handling, edge cases)
+- E2E workflow
 
-## Environment Variables
+## Configuration
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `POLYGON_RPC_URL` | Yes | Polygon RPC endpoint |
-| `PRIVATE_KEY` | Yes | Wallet key for reimbursements (hex) |
+**Required:**
+```bash
+DATABASE_URL="postgresql://user:pass@host:5432/gondor"
+POLYGON_RPC_URL="https://polygon-mainnet.g.alchemy.com/v2/KEY"
+PRIVATE_KEY="0x..."  # Funded wallet for gas and reimbursements
+```
 
-## Dashboard Features
+**Optional:**
+```bash
+PORT=3003
+LOG_LEVEL=info
+```
 
-- **Overview**: TVL, active borrowers, under/above APR cap counts
-- **Charts**: Daily reimbursement amounts (30 days)
-- **Markets**: Breakdown by market with borrower counts
-- **Alerts**: APR violations (>1.5x cap warning, >2x cap critical), reimbursement spikes
+## Transaction Safety
+
+- Pre-flight balance validation before each transfer
+- Retry logic: exponential backoff, max 3 attempts
+- Nonce management (fresh per transaction)
+- Gas estimation + 20% buffer
+- 3 block confirmations required
+- Transaction hash logged for on-chain verification
+
+## Production
+
+**Key Points:**
+- Stateless backend enables horizontal scaling
+- Connection pooling for database
+- In-memory cache (3s TTL) upgradeable to Redis
+- Structured JSON logging for aggregation
+- Health endpoints for load balancer checks
+- Error handling prevents cascading failures
+
+

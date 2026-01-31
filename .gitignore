@@ -54,12 +54,11 @@ NOTES*.md
 TODO*.md
 PRIVATE*.md
 
-# Local dev/debug scripts
-*.sh
-test-*.js
-demo.html
-docker-compose.yml
-docker-compose*.yml
+# Local dev/debug scripts (internal only)
+diagnose.sh
+fix-services.sh
+minimal-test.sh
+start-services-manual.sh
 
 # Secrets and credentials
 *.pem
