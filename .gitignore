@@ -55,13 +55,11 @@ TODO*.md
 PRIVATE*.md
 
 # Local dev/debug scripts
-diagnose.sh
-fix-services.sh
-minimal-test.sh
-start-services-manual.sh
-test-*.sh
+*.sh
 test-*.js
 demo.html
+docker-compose.yml
+docker-compose*.yml
 
 # Secrets and credentials
 *.pem
