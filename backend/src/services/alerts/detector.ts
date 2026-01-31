@@ -212,32 +212,53 @@ async function checkAPRAlerts(): Promise<Alert[]> {
 async function checkReimbursementAlerts(): Promise<Alert[]> {
   const alerts: Alert[] = [];
 
-  // Check today's reimbursements
+  // Check today's reimbursements - need to convert to USD
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const todayReimbursements = await prisma.reimbursement.aggregate({
+  // Get reimbursements with market info for USD conversion
+  const todayReimbursements = await prisma.reimbursement.findMany({
     where: {
       date: { gte: today, lt: tomorrow },
       status: 'processed',
     },
-    _sum: { amount: true },
+    include: {
+      position: {
+        include: { market: true },
+      },
+    },
   });
 
-  const todayTotal = parseFloat(todayReimbursements._sum.amount?.toString() || '0');
+  // Token decimals for conversion
+  const TOKEN_DECIMALS: Record<string, number> = {
+    WETH: 18, wstETH: 18, WBTC: 8, USDC: 6, USDT: 6, WPOL: 18,
+  };
+  const TOKEN_PRICES: Record<string, number> = {
+    WETH: 3200, wstETH: 3600, WBTC: 95000, USDC: 1, USDT: 1, WPOL: 0.45,
+  };
+
+  // Calculate USD total
+  let todayTotalUsd = 0;
+  for (const r of todayReimbursements) {
+    const asset = r.position.market.loanAsset;
+    const decimals = TOKEN_DECIMALS[asset] || 18;
+    const price = TOKEN_PRICES[asset] || 1;
+    const tokenAmount = parseFloat(r.amount.toString()) / Math.pow(10, decimals);
+    todayTotalUsd += tokenAmount * price;
+  }
 
   // Large reimbursement alert
-  if (todayTotal >= ALERT_THRESHOLDS.DAILY_REIMBURSEMENT_WARNING_USD) {
+  if (todayTotalUsd >= ALERT_THRESHOLDS.DAILY_REIMBURSEMENT_WARNING_USD) {
     alerts.push({
       id: generateAlertId(),
       type: 'LARGE_REIMBURSEMENT',
       severity: 'warning',
-      message: `Large daily reimbursement: $${todayTotal.toLocaleString()}`,
+      message: `Large daily reimbursement: $${todayTotalUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
       timestamp: new Date(),
       acknowledged: false,
-      metadata: { amount: todayTotal },
+      metadata: { amount: Math.round(todayTotalUsd) },
     });
   }
 
@@ -245,29 +266,40 @@ async function checkReimbursementAlerts(): Promise<Alert[]> {
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  const yesterdayReimbursements = await prisma.reimbursement.aggregate({
+  const yesterdayReimbursements = await prisma.reimbursement.findMany({
     where: {
       date: { gte: yesterday, lt: today },
       status: 'processed',
     },
-    _sum: { amount: true },
+    include: {
+      position: {
+        include: { market: true },
+      },
+    },
   });
 
-  const yesterdayTotal = parseFloat(yesterdayReimbursements._sum.amount?.toString() || '0');
+  let yesterdayTotalUsd = 0;
+  for (const r of yesterdayReimbursements) {
+    const asset = r.position.market.loanAsset;
+    const decimals = TOKEN_DECIMALS[asset] || 18;
+    const price = TOKEN_PRICES[asset] || 1;
+    const tokenAmount = parseFloat(r.amount.toString()) / Math.pow(10, decimals);
+    yesterdayTotalUsd += tokenAmount * price;
+  }
 
-  if (yesterdayTotal > 0) {
-    const spikeRatio = todayTotal / yesterdayTotal;
+  if (yesterdayTotalUsd > 0) {
+    const spikeRatio = todayTotalUsd / yesterdayTotalUsd;
     if (spikeRatio >= (1 + ALERT_THRESHOLDS.DAILY_SPIKE_PERCENT / 100)) {
       alerts.push({
         id: generateAlertId(),
         type: 'REIMBURSEMENT_SPIKE',
         severity: 'info',
-        message: `Reimbursement spike: +${((spikeRatio - 1) * 100).toFixed(0)}% (${todayTotal.toLocaleString()} vs ${yesterdayTotal.toLocaleString()})`,
+        message: `Reimbursement spike: +${((spikeRatio - 1) * 100).toFixed(0)}% ($${todayTotalUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })} vs $${yesterdayTotalUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })})`,
         timestamp: new Date(),
         acknowledged: false,
         metadata: {
-          todayAmount: todayTotal,
-          yesterdayAmount: yesterdayTotal,
+          todayAmount: Math.round(todayTotalUsd),
+          yesterdayAmount: Math.round(yesterdayTotalUsd),
           spikeRatio,
         },
       });

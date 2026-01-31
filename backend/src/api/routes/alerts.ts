@@ -15,7 +15,9 @@ const router = Router();
 
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   try {
-    const alerts = await checkAlerts();
+    // Get stored alerts (unresolved) instead of real-time detection
+    // This ensures manually created alerts and persisted alerts are shown
+    const alerts = await getStoredAlerts({ resolved: false, limit: 50 });
 
     // Filter by severity if requested
     const severity = req.query.severity as string;

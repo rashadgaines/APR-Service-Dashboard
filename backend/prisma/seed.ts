@@ -13,7 +13,7 @@ const TOKEN_DECIMALS: Record<string, number> = {
     POL: 18,
 };
 
-// Realistic token prices for USD calculations
+// Token prices for USD calculations
 const TOKEN_PRICES: Record<string, number> = {
     WETH: 3200,
     wstETH: 3600,
@@ -28,7 +28,6 @@ function toRawUnits(amount: number, asset: string): Decimal {
     return new Decimal(amount).mul(new Decimal(10).pow(decimals));
 }
 
-// Generate realistic random address
 function randomAddress(): string {
     const chars = '0123456789abcdef';
     let addr = '0x';
@@ -38,13 +37,21 @@ function randomAddress(): string {
     return addr;
 }
 
-// Generate random APR between min and max (in decimal form)
-function randomApr(min: number, max: number): Decimal {
-    return new Decimal(min + Math.random() * (max - min));
+function randomTxHash(): string {
+    return '0x' + [...Array(64)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
 }
 
 async function main() {
-    console.log('🌱 Seeding database with scaled units...');
+    console.log('🧹 Clearing existing data...');
+    await prisma.alert.deleteMany();
+    await prisma.reimbursement.deleteMany();
+    await prisma.interestAccrual.deleteMany();
+    await prisma.dailySnapshot.deleteMany();
+    await prisma.position.deleteMany();
+    await prisma.borrower.deleteMany();
+    await prisma.market.deleteMany();
+
+    console.log('🌱 Seeding demo data...');
 
     // 1. Create Markets
     const markets = [
@@ -55,7 +62,7 @@ async function main() {
             loanAsset: 'WETH',
             vaultAddress: '0xF5C81d25ee174d83f1FD202cA94AE6070d073cCF',
             lltv: new Decimal('0.915'),
-            aprCap: new Decimal('0.08'),
+            aprCap: new Decimal('0.08'), // 8%
         },
         {
             marketId: '0x1cfe584af3db05c7f39d60e458a87a8b2f6b5d8c6125631984ec489f1d13553b',
@@ -64,7 +71,7 @@ async function main() {
             loanAsset: 'USDC',
             vaultAddress: '0xAcB0DCe4b0FF400AD8F6917f3ca13E434C9ed6bC',
             lltv: new Decimal('0.86'),
-            aprCap: new Decimal('0.10'),
+            aprCap: new Decimal('0.10'), // 10%
         },
         {
             marketId: '0x7506b33817b57f686e37b87b5d4c5c93fdef4cffd21bbf9291f18b2f29ab0550',
@@ -73,126 +80,125 @@ async function main() {
             loanAsset: 'USDC',
             vaultAddress: '0xfD06859A671C21497a2EB8C5E3fEA48De924D6c8',
             lltv: new Decimal('0.77'),
-            aprCap: new Decimal('0.12'),
+            aprCap: new Decimal('0.12'), // 12%
         },
     ];
 
     for (const m of markets) {
-        await prisma.market.upsert({
-            where: { marketId: m.marketId },
-            update: m,
-            create: m,
-        });
+        await prisma.market.create({ data: m });
     }
+    console.log('  ✓ Created 3 markets');
 
-    // 2. Create sample Borrowers (more realistic count for demo)
-    const borrowerCount = 12; // Enough to show variety
-    const borrowers = [];
+    const dbMarkets = await prisma.market.findMany();
 
-    // Some known addresses for demo
-    const knownAddresses = [
-        '0x742d35Cc6634C0532925a3b844Bc9e7595f8fEb1',
-        '0x8ba1f109551bD432803012645Hac136c6e7dD2A',
-        '0xdF3e18d64BC6A983f673Ab319CCaE4f1a57C7097',
-        '0xcd3B766CCdD6AE721141F452C550Ca635964ce71',
-        '0x2546BcD3c84621e976D8185a91A922aE77ECEc30',
+    // 2. Create Borrowers - mix of under and above cap
+    const borrowerConfigs = [
+        // Above cap borrowers (will need reimbursements)
+        { address: '0x742d35cc6634c0532925a3b844bc9e7595f8feb1', aboveCap: true, size: 'large' },
+        { address: '0x8ba1f109551bd432803012645ac136c6e7dd2a3b', aboveCap: true, size: 'large' },
+        { address: '0xdf3e18d64bc6a983f673ab319ccae4f1a57c7097', aboveCap: true, size: 'medium' },
+        { address: '0xcd3b766ccdd6ae721141f452c550ca635964ce71', aboveCap: true, size: 'medium' },
+        { address: '0x2546bcd3c84621e976d8185a91a922ae77ecec30', aboveCap: true, size: 'small' },
+        { address: '0x1234567890abcdef1234567890abcdef12345678', aboveCap: true, size: 'small' },
+        { address: '0xabcdef1234567890abcdef1234567890abcdef12', aboveCap: true, size: 'medium' },
+        // Under cap borrowers (compliant)
+        { address: '0x9876543210fedcba9876543210fedcba98765432', aboveCap: false, size: 'large' },
+        { address: '0xfedcba0987654321fedcba0987654321fedcba09', aboveCap: false, size: 'large' },
+        { address: '0x1111222233334444555566667777888899990000', aboveCap: false, size: 'medium' },
+        { address: '0xaaaabbbbccccddddeeeeffffgggg111122223333', aboveCap: false, size: 'medium' },
+        { address: '0x5555666677778888999900001111222233334444', aboveCap: false, size: 'small' },
     ];
 
-    for (let i = 0; i < borrowerCount; i++) {
-        const addr = i < knownAddresses.length ? knownAddresses[i] : randomAddress();
-        borrowers.push({ address: addr.toLowerCase() });
-    }
-
-    const createdBorrowers = [];
-    for (const b of borrowers) {
-        const created = await prisma.borrower.upsert({
-            where: { address: b.address },
-            update: {},
-            create: b,
+    // Add more random borrowers
+    for (let i = 0; i < 35; i++) {
+        borrowerConfigs.push({
+            address: randomAddress(),
+            aboveCap: Math.random() > 0.6, // 40% above cap
+            size: ['small', 'medium', 'large'][Math.floor(Math.random() * 3)] as 'small' | 'medium' | 'large',
         });
-        createdBorrowers.push(created);
     }
-    console.log(`  Created ${createdBorrowers.length} borrowers`);
 
-    // 3. Create sample Positions with variety
-    const dbMarkets = await prisma.market.findMany();
+    const sizeMultipliers = { small: 1, medium: 5, large: 20 };
     let positionCount = 0;
-    let accrualCount = 0;
     let reimbursementCount = 0;
 
-    for (let i = 0; i < createdBorrowers.length; i++) {
-        const borrower = createdBorrowers[i];
+    for (const config of borrowerConfigs) {
+        const borrower = await prisma.borrower.create({
+            data: { address: config.address.toLowerCase() },
+        });
 
-        // Each borrower has positions in 1-3 markets randomly
-        const marketCount = 1 + Math.floor(Math.random() * dbMarkets.length);
-        const shuffledMarkets = [...dbMarkets].sort(() => Math.random() - 0.5).slice(0, marketCount);
+        // Each borrower has 1-3 positions
+        const numPositions = 1 + Math.floor(Math.random() * 3);
+        const shuffledMarkets = [...dbMarkets].sort(() => Math.random() - 0.5).slice(0, numPositions);
 
         for (const market of shuffledMarkets) {
-            // Vary position sizes realistically
-            const principalMultiplier = 0.5 + Math.random() * 10; // 0.5x to 10.5x base
-            const collateralMultiplier = principalMultiplier * (1.2 + Math.random() * 0.3); // 120-150% collateral ratio
+            const baseAmount = sizeMultipliers[config.size] * (0.8 + Math.random() * 0.4);
+            const price = TOKEN_PRICES[market.loanAsset] || 1;
+
+            // Principal in USD terms: small=$1k-5k, medium=$5k-25k, large=$20k-100k
+            const principalUsd = baseAmount * 1000;
+            const principalTokens = principalUsd / price;
 
             const position = await prisma.position.create({
                 data: {
                     borrowerId: borrower.id,
                     marketId: market.id,
-                    principal: toRawUnits(principalMultiplier, market.loanAsset),
-                    collateral: toRawUnits(collateralMultiplier, market.collateralAsset),
-                    isActive: Math.random() > 0.1, // 90% active
-                    openedAt: new Date(Date.now() - Math.floor(Math.random() * 60) * 24 * 60 * 60 * 1000), // 0-60 days ago
+                    principal: toRawUnits(principalTokens, market.loanAsset),
+                    collateral: toRawUnits(principalTokens * 1.4, market.collateralAsset),
+                    isActive: true,
+                    openedAt: new Date(Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000),
                 },
             });
             positionCount++;
 
-            // 4. Create Interest Accruals for last 30 days
-            // Some borrowers above cap, some below, some mixed
-            const isAboveCap = Math.random() > 0.6; // 40% above cap
-            const aprCapDecimal = parseFloat(market.aprCap.toString());
+            const aprCap = parseFloat(market.aprCap.toString());
 
-            for (let d = 0; d < 30; d++) {
+            // Create 14 days of interest accruals
+            for (let d = 0; d < 14; d++) {
                 const date = new Date();
                 date.setDate(date.getDate() - d);
                 date.setHours(0, 0, 0, 0);
 
-                // Vary APR - sometimes above cap, sometimes below
-                const dayVariance = Math.random() > 0.7; // 30% chance of different behavior
-                const actualAprValue = isAboveCap !== dayVariance
-                    ? aprCapDecimal * (1.1 + Math.random() * 0.9) // 110% to 200% of cap
-                    : aprCapDecimal * (0.5 + Math.random() * 0.4); // 50% to 90% of cap
+                // APR: above cap gets 130-180% of cap, below cap gets 60-90% of cap
+                const actualApr = config.aboveCap
+                    ? aprCap * (1.3 + Math.random() * 0.5)
+                    : aprCap * (0.6 + Math.random() * 0.3);
 
-                const dailyInterest = principalMultiplier * (actualAprValue / 365);
-                const cappedInterest = principalMultiplier * (aprCapDecimal / 365);
+                const dailyInterest = principalTokens * (actualApr / 365);
+                const cappedInterest = principalTokens * (aprCap / 365);
                 const excessInterest = Math.max(0, dailyInterest - cappedInterest);
 
                 await prisma.interestAccrual.create({
                     data: {
                         positionId: position.id,
-                        date: date,
+                        date,
                         accruedAmt: toRawUnits(dailyInterest, market.loanAsset),
-                        actualApr: new Decimal(actualAprValue),
+                        actualApr: new Decimal(actualApr),
                         cappedApr: market.aprCap,
                         excessAmt: toRawUnits(excessInterest, market.loanAsset),
                     },
                 });
-                accrualCount++;
             }
 
-            // 5. Create Reimbursements for positions above cap (past week)
-            if (isAboveCap) {
-                for (let d = 1; d <= 7; d++) {
-                    if (Math.random() > 0.3) { // 70% chance of reimbursement
-                        const reimbDate = new Date();
-                        reimbDate.setDate(reimbDate.getDate() - d);
+            // Create reimbursements for above-cap positions
+            if (config.aboveCap) {
+                for (let d = 0; d <= 7; d++) {
+                    const reimbDate = new Date();
+                    reimbDate.setDate(reimbDate.getDate() - d);
+                    reimbDate.setHours(0, 0, 0, 0);
 
-                        const reimbAmount = principalMultiplier * 0.0002 * (0.5 + Math.random()); // Vary amounts
+                    // Reimbursement = excess interest in USD terms
+                    const excessApr = aprCap * (0.3 + Math.random() * 0.5); // 30-80% excess
+                    const dailyExcess = principalUsd * (excessApr / 365);
 
+                    if (dailyExcess > 0.01) {
                         await prisma.reimbursement.create({
                             data: {
                                 positionId: position.id,
                                 date: reimbDate,
-                                amount: toRawUnits(reimbAmount, market.loanAsset),
-                                status: Math.random() > 0.05 ? 'processed' : 'failed', // 5% failed
-                                txHash: '0x' + [...Array(64)].map(() => Math.floor(Math.random() * 16).toString(16)).join(''),
+                                amount: toRawUnits(dailyExcess / price, market.loanAsset),
+                                status: 'processed',
+                                txHash: randomTxHash(),
                             },
                         });
                         reimbursementCount++;
@@ -201,115 +207,94 @@ async function main() {
             }
         }
     }
-    console.log(`  Created ${positionCount} positions, ${accrualCount} accruals, ${reimbursementCount} reimbursements`);
 
-    // 6. Create Daily Snapshots (30 days of history)
+    const totalBorrowers = borrowerConfigs.length;
+    const aboveCapCount = borrowerConfigs.filter(b => b.aboveCap).length;
+    console.log(`  ✓ Created ${totalBorrowers} borrowers (${aboveCapCount} above cap)`);
+    console.log(`  ✓ Created ${positionCount} positions`);
+    console.log(`  ✓ Created ${reimbursementCount} reimbursements`);
+
+    // 3. Create Daily Snapshots for charts
     console.log('  Creating daily snapshots...');
     for (const market of dbMarkets) {
-        // Calculate actual position counts for this market
-        const marketPositions = await prisma.position.findMany({
-            where: { marketId: market.id },
-            select: { principal: true, borrowerId: true },
-        });
-
-        const uniqueBorrowers = new Set(marketPositions.map(p => p.borrowerId)).size;
-        const totalPrincipal = marketPositions.reduce((sum, p) => sum.add(new Decimal(p.principal.toString())), new Decimal(0));
-
-        for (let i = 0; i < 30; i++) {
+        for (let d = 0; d < 14; d++) {
             const date = new Date();
-            date.setDate(date.getDate() - i);
+            date.setDate(date.getDate() - d);
             date.setHours(0, 0, 0, 0);
 
-            // Add some variance to historical data
-            const variance = 0.9 + Math.random() * 0.2;
-            const aprCapValue = parseFloat(market.aprCap.toString());
-            const avgAprValue = aprCapValue * (0.8 + Math.random() * 0.6); // 80% to 140% of cap
+            const marketPositions = await prisma.position.count({ where: { marketId: market.id } });
+            const variance = 0.85 + Math.random() * 0.3;
 
-            await prisma.dailySnapshot.upsert({
-                where: {
-                    marketId_date: { marketId: market.id, date },
-                },
-                update: {},
-                create: {
+            await prisma.dailySnapshot.create({
+                data: {
                     marketId: market.id,
-                    date: date,
-                    totalBorrowed: totalPrincipal.mul(variance),
-                    avgApr: new Decimal(avgAprValue),
-                    borrowerCount: Math.max(1, Math.floor(uniqueBorrowers * variance)),
-                    aboveCapCount: Math.floor(uniqueBorrowers * variance * 0.4), // ~40% above cap
+                    date,
+                    totalBorrowed: toRawUnits(500000 * variance, market.loanAsset),
+                    avgApr: new Decimal(parseFloat(market.aprCap.toString()) * (0.9 + Math.random() * 0.4)),
+                    borrowerCount: Math.floor(marketPositions * variance),
+                    aboveCapCount: Math.floor(marketPositions * variance * 0.4),
                 },
             });
         }
     }
 
-    // 7. Create sample Alerts with variety
+    // 4. Create Active Alerts (visible in dashboard)
     console.log('  Creating alerts...');
-    const alertConfigs = [
-        {
-            type: 'HIGH_APR',
-            severity: 'critical',
-            message: 'wstETH/WETH market APR is 185% above cap (14.8% vs 8%)',
-            marketId: '0xb8ae474af3b91c8143303723618b31683b52e9c86566aa54c06f0bc27906bcae',
-            marketName: 'wstETH/WETH',
-            acknowledged: false,
-            metadata: { currentApr: 1480, capApr: 800, ratio: 1.85 },
-        },
-        {
-            type: 'ELEVATED_APR',
-            severity: 'warning',
-            message: 'WBTC/USDC market APR is 160% above cap (16% vs 10%)',
-            marketId: '0x1cfe584af3db05c7f39d60e458a87a8b2f6b5d8c6125631984ec489f1d13553b',
-            marketName: 'WBTC/USDC',
-            acknowledged: false,
-            metadata: { currentApr: 1600, capApr: 1000, ratio: 1.6 },
-        },
-        {
-            type: 'LARGE_REIMBURSEMENT',
-            severity: 'warning',
-            message: 'Large daily reimbursement: $12,450',
-            acknowledged: true,
-            acknowledgedBy: 'admin@gondor.fi',
-            metadata: { amount: 12450 },
-        },
-        {
-            type: 'REIMBURSEMENT_SPIKE',
-            severity: 'info',
-            message: 'Reimbursement spike: +65% ($8,200 vs $4,970 yesterday)',
-            acknowledged: true,
-            acknowledgedBy: 'system',
-            metadata: { todayAmount: 8200, yesterdayAmount: 4970, spikeRatio: 1.65 },
-        },
-        {
-            type: 'SYNC_FAILURE',
-            severity: 'critical',
-            message: 'Position sync may have failed - no recent updates',
-            acknowledged: true,
-            acknowledgedBy: 'ops@gondor.fi',
-            resolvedAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // Resolved 2 hours ago
-        },
-    ];
+    const now = new Date();
 
-    for (const alert of alertConfigs) {
-        const createdAt = new Date(Date.now() - Math.floor(Math.random() * 48) * 60 * 60 * 1000); // 0-48 hours ago
-
-        await prisma.alert.create({
-            data: {
-                type: alert.type,
-                severity: alert.severity,
-                message: alert.message,
-                marketId: alert.marketId || null,
-                marketName: alert.marketName || null,
-                metadata: alert.metadata || null,
-                acknowledged: alert.acknowledged || false,
-                acknowledgedBy: alert.acknowledgedBy || null,
-                acknowledgedAt: alert.acknowledged ? new Date(createdAt.getTime() + 30 * 60 * 1000) : null,
-                resolvedAt: alert.resolvedAt || null,
-                createdAt,
+    await prisma.alert.createMany({
+        data: [
+            {
+                type: 'HIGH_APR',
+                severity: 'critical',
+                message: 'wstETH/WETH market APR at 14.8% (185% of 8% cap)',
+                marketId: '0xb8ae474af3b91c8143303723618b31683b52e9c86566aa54c06f0bc27906bcae',
+                marketName: 'wstETH/WETH',
+                acknowledged: false,
+                metadata: { currentApr: 1480, capApr: 800, ratio: 1.85 },
+                createdAt: new Date(now.getTime() - 15 * 60 * 1000), // 15 min ago
             },
-        });
-    }
+            {
+                type: 'ELEVATED_APR',
+                severity: 'warning',
+                message: 'WBTC/USDC market APR at 16% (160% of 10% cap)',
+                marketId: '0x1cfe584af3db05c7f39d60e458a87a8b2f6b5d8c6125631984ec489f1d13553b',
+                marketName: 'WBTC/USDC',
+                acknowledged: false,
+                metadata: { currentApr: 1600, capApr: 1000, ratio: 1.6 },
+                createdAt: new Date(now.getTime() - 45 * 60 * 1000), // 45 min ago
+            },
+            {
+                type: 'LARGE_REIMBURSEMENT',
+                severity: 'warning',
+                message: 'Daily reimbursement total: $8,234',
+                acknowledged: false,
+                metadata: { amount: 8234 },
+                createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2 hours ago
+            },
+            {
+                type: 'REIMBURSEMENT_SPIKE',
+                severity: 'info',
+                message: 'Reimbursements up 42% vs yesterday',
+                acknowledged: true,
+                acknowledgedBy: 'system',
+                acknowledgedAt: new Date(now.getTime() - 1 * 60 * 60 * 1000),
+                metadata: { spikePercent: 42 },
+                createdAt: new Date(now.getTime() - 3 * 60 * 60 * 1000), // 3 hours ago
+            },
+        ],
+    });
 
-    console.log('✅ Seeding complete with correct scaling!');
+    console.log('  ✓ Created 4 alerts (2 critical/warning unacknowledged)');
+    console.log('');
+    console.log('✅ Demo seeding complete!');
+    console.log('');
+    console.log('📊 Dashboard should now show:');
+    console.log(`   - ${totalBorrowers} total borrowers`);
+    console.log(`   - ${totalBorrowers - aboveCapCount} under APR cap`);
+    console.log(`   - ${aboveCapCount} above APR cap (need reimbursement)`);
+    console.log('   - Daily reimbursements chart with 7 days of data');
+    console.log('   - Active alerts in the alerts panel');
 }
 
 main()
