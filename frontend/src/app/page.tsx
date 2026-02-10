@@ -118,10 +118,11 @@ export default function Dashboard() {
         )}
 
         {/* Charts Section */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Daily Reimbursements Chart - takes 2/3 width on desktop */}
-          <div className="lg:col-span-2">
+        <section className="grid grid-cols-1 lg:grid-cols-3 items-start gap-4 sm:gap-6">
+          {/* Daily Reimbursements + Excess Interest */}
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             <DailyReimbursementsChart />
+            <ExcessInterestChart />
           </div>
 
           {/* Sidebar - Market Breakdown and Alerts */}
@@ -129,11 +130,6 @@ export default function Dashboard() {
             <MarketBreakdownChart />
             <RecentAlerts />
           </div>
-        </section>
-
-        {/* Excess Interest Chart */}
-        <section className="mt-4 sm:mt-6">
-          <ExcessInterestChart />
         </section>
 
         {/* Footer */}

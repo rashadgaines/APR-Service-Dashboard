@@ -127,7 +127,7 @@ export function ReimbursementChart({ data, canvasId = "reimbursementChart" }: Re
   }, [data, canvasId]);
 
   return (
-    <Card className="h-full border border-border/50">
+    <Card className="border border-border/50">
       <CardHeader className="pt-6 px-6 pb-2">
         <CardTitle className="font-serif text-xl">Daily Reimbursements</CardTitle>
         <p className="text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/60 mt-1">

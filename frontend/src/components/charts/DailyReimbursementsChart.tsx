@@ -10,7 +10,7 @@ export function DailyReimbursementsChart() {
 
   if (loading) {
     return (
-      <Card className="h-full border border-border/50">
+      <Card className="border border-border/50">
         <CardHeader className="pt-6 px-6 pb-2">
           <CardTitle className="font-serif text-xl">Daily Reimbursements</CardTitle>
         </CardHeader>
@@ -23,7 +23,7 @@ export function DailyReimbursementsChart() {
 
   if (error || !data) {
     return (
-      <Card className="h-full border border-border/50 border-destructive/20 bg-destructive/5">
+      <Card className="border border-border/50 border-destructive/20 bg-destructive/5">
         <CardHeader className="pt-6 px-6 pb-2">
           <CardTitle className="font-serif text-xl">Daily Reimbursements</CardTitle>
         </CardHeader>
@@ -58,7 +58,7 @@ export function DailyReimbursementsChart() {
 
   return (
     !hasData ? (
-      <Card className="h-full border border-border/50">
+      <Card className="border border-border/50">
         <CardHeader className="pt-6 px-6 pb-2">
           <CardTitle className="font-serif text-xl">Daily Reimbursements</CardTitle>
         </CardHeader>
