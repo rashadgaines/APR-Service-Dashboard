@@ -80,6 +80,17 @@ export function useOverviewMetrics(refreshInterval = DEFAULT_REFRESH_INTERVAL) {
     }
   }, []);
 
+  const forceRefetch = useCallback(async () => {
+    try {
+      const result = await apiClient.getOverviewForce<MetricsOverview>();
+      setData(result);
+      setLastUpdated(new Date());
+      setError(null);
+    } catch {
+      // silent — fall back to existing data
+    }
+  }, []);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -100,7 +111,7 @@ export function useOverviewMetrics(refreshInterval = DEFAULT_REFRESH_INTERVAL) {
     };
   }, [fetchData, refreshInterval, isVisible]);
 
-  return { data, loading, error, refetch: fetchData, lastUpdated };
+  return { data, loading, error, refetch: fetchData, forceRefetch, lastUpdated };
 }
 
 export function useDailyMetrics(days = 30, refreshInterval = DEFAULT_REFRESH_INTERVAL) {
@@ -127,6 +138,17 @@ export function useDailyMetrics(days = 30, refreshInterval = DEFAULT_REFRESH_INT
     }
   }, [days]);
 
+  const forceRefetch = useCallback(async () => {
+    try {
+      const result = await apiClient.getDailyMetricsForce<{ data: DailyReimbursementData[] }>(days);
+      setData(result);
+      setLastUpdated(new Date());
+      setError(null);
+    } catch {
+      // silent
+    }
+  }, [days]);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -147,7 +169,7 @@ export function useDailyMetrics(days = 30, refreshInterval = DEFAULT_REFRESH_INT
     };
   }, [fetchData, refreshInterval, isVisible]);
 
-  return { data, loading, error, lastUpdated };
+  return { data, loading, error, forceRefetch, lastUpdated };
 }
 
 export function useMarketMetrics(refreshInterval = DEFAULT_REFRESH_INTERVAL) {
@@ -174,6 +196,17 @@ export function useMarketMetrics(refreshInterval = DEFAULT_REFRESH_INTERVAL) {
     }
   }, []);
 
+  const forceRefetch = useCallback(async () => {
+    try {
+      const result = await apiClient.getMarketMetricsForce<MarketMetrics>();
+      setData(result);
+      setLastUpdated(new Date());
+      setError(null);
+    } catch {
+      // silent
+    }
+  }, []);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -194,5 +227,5 @@ export function useMarketMetrics(refreshInterval = DEFAULT_REFRESH_INTERVAL) {
     };
   }, [fetchData, refreshInterval, isVisible]);
 
-  return { data, loading, error, lastUpdated };
+  return { data, loading, error, forceRefetch, lastUpdated };
 }

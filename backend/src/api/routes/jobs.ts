@@ -3,6 +3,7 @@ import { getJobStatuses, runJob } from '@/services/reimbursement/scheduler';
 import { asyncHandler, AppError } from '@/api/middleware/error';
 import { prisma } from '@/config/database';
 import { logger } from '@/utils/logger';
+import { broadcast } from '@/services/websocket';
 
 const router = Router();
 
@@ -46,6 +47,12 @@ router.post('/:jobName/run', asyncHandler(async (req: Request, res: Response) =>
     throw new AppError(result.error || 'Job execution failed', 500);
   }
 
+  if (jobName === 'position-sync') {
+    broadcast('positions_synced', { jobName, manual: true });
+  } else if (jobName === 'daily-reimbursement') {
+    broadcast('reimbursements_executed', { jobName, manual: true });
+  }
+
   res.json({
     success: true,
     message: `Job ${jobName} executed successfully`,
@@ -86,6 +93,9 @@ router.post('/run-all', asyncHandler(async (_req: Request, res: Response) => {
 
   const successCount = results.filter(r => r.success).length;
   const failureCount = results.length - successCount;
+
+  broadcast('positions_synced', { manual: true, runAll: true });
+  broadcast('reimbursements_executed', { manual: true, runAll: true });
 
   res.json({
     message: `Executed ${results.length} jobs: ${successCount} successful, ${failureCount} failed`,

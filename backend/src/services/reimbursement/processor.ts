@@ -269,6 +269,7 @@ export async function getReimbursementHistory(options: {
   amount: Decimal;
   txHash: string | null;
   status: string;
+  createdAt: Date;
 }>> {
   const where: any = {};
 
@@ -324,6 +325,7 @@ export async function getReimbursementHistory(options: {
       amount: humanAmount,
       txHash: r.txHash,
       status: r.status,
+      createdAt: r.createdAt,
     };
   });
 }

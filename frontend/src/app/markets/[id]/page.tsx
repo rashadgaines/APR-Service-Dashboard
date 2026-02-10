@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -19,6 +20,7 @@ import {
   DollarSign,
   ExternalLink,
 } from 'lucide-react';
+import { AprVsCapChart } from '@/components/charts/AprVsCapChart';
 
 interface MarketDetail {
   id: string;
@@ -323,87 +325,147 @@ export default function MarketDetailPage() {
           </Card>
         </div>
 
-        {/* Active Positions */}
+        {/* APR vs Cap Chart */}
+        {market.snapshots && market.snapshots.length > 0 && (
+          <div className="mb-16">
+            <AprVsCapChart snapshots={market.snapshots} aprCap={market.aprCap} />
+          </div>
+        )}
+
+        {/* All Positions */}
         {market.positions && market.positions.length > 0 && (
-          <Card className="border-border/50">
-            <CardHeader className="pt-6 px-8 flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-3 text-xl font-serif">
-                <Users className="h-4 w-4 text-primary/60" />
-                Top Positions
-              </CardTitle>
-              <Badge variant="secondary" className="px-3 py-1 font-sans text-[10px] font-bold uppercase tracking-widest">
-                {market.positions.length} Total
-              </Badge>
-            </CardHeader>
-            <CardContent className="px-8 pb-8">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border/30">
-                      <th className="text-left py-4 px-2 text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/50">
-                        Borrower
-                      </th>
-                      <th className="text-right py-4 px-2 text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/50">
-                        Principal
-                      </th>
-                      <th className="text-right py-4 px-2 text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/50">
-                        Collateral
-                      </th>
-                      <th className="text-right py-4 px-2 text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/50">
-                        Position Age
-                      </th>
-                      <th className="text-right py-4 px-2 text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/50">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/20">
-                    {market.positions.slice(0, 10).map((position) => (
-                      <tr key={position.id} className="group hover:bg-muted/30 transition-colors">
-                        <td className="py-4 px-2">
-                          <Link
-                            href={`/borrowers/${position.borrowerAddress}`}
-                            className="font-mono text-xs text-primary hover:underline hover:text-primary/80 transition-colors"
-                          >
-                            {position.borrowerAddress.slice(0, 12)}...{position.borrowerAddress.slice(-8)}
-                          </Link>
-                        </td>
-                        <td className="text-right py-4 px-2 font-serif font-bold text-foreground/80">
-                          {formatCurrency(position.principal)}
-                        </td>
-                        <td className="text-right py-4 px-2 text-xs text-muted-foreground/70">
-                          {formatCurrency(position.collateral)}
-                        </td>
-                        <td className="text-right py-4 px-2 text-[10px] font-medium text-muted-foreground/60 uppercase">
-                          {new Date(position.openedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </td>
-                        <td className="text-right py-4 px-2">
-                          <Badge
-                            variant={position.isActive ? 'secondary' : 'outline'}
-                            className={cn(
-                              "px-2 py-0 text-[9px] uppercase tracking-tighter",
-                              position.isActive ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : ''
-                            )}
-                          >
-                            {position.isActive ? 'Active' : 'Settled'}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {market.positions.length > 10 && (
-                <div className="mt-8 pt-4 border-t border-border/30 text-center">
-                  <p className="text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/40">
-                    Showing top 10 positions of {market.positions.length}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <PositionsTable positions={market.positions} />
         )}
       </main>
     </div>
+  );
+}
+
+const PAGE_SIZE = 25;
+
+function PositionsTable({ positions }: { positions: NonNullable<MarketDetail['positions']> }) {
+  const [page, setPage] = useState(0);
+  const [showAll, setShowAll] = useState(false);
+
+  const totalCount = positions.length;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const needsPagination = totalCount > PAGE_SIZE;
+
+  const visiblePositions = useMemo(() => {
+    if (showAll) return positions;
+    return positions.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  }, [positions, page, showAll]);
+
+  const startIdx = showAll ? 1 : page * PAGE_SIZE + 1;
+  const endIdx = showAll ? totalCount : Math.min((page + 1) * PAGE_SIZE, totalCount);
+
+  return (
+    <Card className="border-border/50">
+      <CardHeader className="pt-6 px-8 flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-3 text-xl font-serif">
+          <Users className="h-4 w-4 text-primary/60" />
+          All Positions
+        </CardTitle>
+        <Badge variant="secondary" className="px-3 py-1 font-sans text-[10px] font-bold uppercase tracking-widest">
+          {totalCount} Total
+        </Badge>
+      </CardHeader>
+      <CardContent className="px-8 pb-8">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border/30">
+                <th className="text-left py-4 px-2 text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/50">
+                  Borrower
+                </th>
+                <th className="text-right py-4 px-2 text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/50">
+                  Principal
+                </th>
+                <th className="text-right py-4 px-2 text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/50">
+                  Collateral
+                </th>
+                <th className="text-right py-4 px-2 text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/50">
+                  Position Age
+                </th>
+                <th className="text-right py-4 px-2 text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/50">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/20">
+              {visiblePositions.map((position) => (
+                <tr key={position.id} className="group hover:bg-muted/30 transition-colors">
+                  <td className="py-4 px-2">
+                    <Link
+                      href={`/borrowers/${position.borrowerAddress}`}
+                      className="font-mono text-xs text-primary hover:underline hover:text-primary/80 transition-colors"
+                    >
+                      {position.borrowerAddress.slice(0, 12)}...{position.borrowerAddress.slice(-8)}
+                    </Link>
+                  </td>
+                  <td className="text-right py-4 px-2 font-serif font-bold text-foreground/80">
+                    {formatCurrency(position.principal)}
+                  </td>
+                  <td className="text-right py-4 px-2 text-xs text-muted-foreground/70">
+                    {formatCurrency(position.collateral)}
+                  </td>
+                  <td className="text-right py-4 px-2 text-[10px] font-medium text-muted-foreground/60 uppercase">
+                    {new Date(position.openedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </td>
+                  <td className="text-right py-4 px-2">
+                    <Badge
+                      variant={position.isActive ? 'secondary' : 'outline'}
+                      className={cn(
+                        "px-2 py-0 text-[9px] uppercase tracking-tighter",
+                        position.isActive ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : ''
+                      )}
+                    >
+                      {position.isActive ? 'Active' : 'Settled'}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {needsPagination && (
+          <div className="mt-6 pt-4 border-t border-border/30 flex items-center justify-between">
+            <p className="text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/40">
+              {showAll ? `Showing all ${totalCount} positions` : `${startIdx}\u2013${endIdx} of ${totalCount}`}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowAll(s => !s)}
+                className="text-[10px] font-sans font-bold uppercase tracking-widest text-primary hover:text-primary/70 transition-colors px-2 py-1"
+              >
+                {showAll ? 'Paginate' : 'Show all'}
+              </button>
+              {!showAll && (
+                <>
+                  <button
+                    onClick={() => setPage(p => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                    className="p-1.5 rounded border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="text-[10px] font-sans font-bold text-muted-foreground/60 tabular-nums min-w-[3rem] text-center">
+                    {page + 1} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                    disabled={page >= totalPages - 1}
+                    className="p-1.5 rounded border border-border/50 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -29,6 +29,7 @@ interface Reimbursement {
   amount: string;
   txHash: string | null;
   status: string;
+  createdAt: string;
 }
 
 export default function ReimbursementsPage() {
@@ -69,9 +70,10 @@ export default function ReimbursementsPage() {
   const exportToCSV = () => {
     if (reimbursements.length === 0) return;
 
-    const headers = ['Date', 'Borrower', 'Market', 'Amount', 'Status', 'Transaction Hash'];
+    const headers = ['Date', 'Timestamp', 'Borrower', 'Market', 'Amount', 'Status', 'Transaction Hash'];
     const rows = reimbursements.map(r => [
       new Date(r.date).toISOString().split('T')[0],
+      new Date(r.createdAt).toISOString(),
       r.borrowerAddress,
       r.marketName,
       r.amount,
@@ -263,6 +265,9 @@ export default function ReimbursementsPage() {
                         Date
                       </th>
                       <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
+                        Time
+                      </th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
                         Borrower
                       </th>
                       <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">
@@ -287,6 +292,9 @@ export default function ReimbursementsPage() {
                       >
                         <td className="py-3 px-4 text-sm">
                           {new Date(reimbursement.date).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-muted-foreground">
+                          {new Date(reimbursement.createdAt).toLocaleTimeString()}
                         </td>
                         <td className="py-3 px-4">
                           <Link

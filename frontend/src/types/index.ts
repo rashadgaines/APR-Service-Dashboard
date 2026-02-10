@@ -29,17 +29,18 @@ export interface MarketMetrics {
 
 export interface Market {
   id: string;
+  marketId?: string;
   name: string;
   collateralAsset: string;
   loanAsset: string;
   lltv: string;
   aprCap: string;
-  currentApr: string;
-  aprRatio: string;
+  currentApr?: string;
+  aprRatio?: string;
   totalBorrowed: string;
   borrowerCount: number;
   aboveCapCount: number;
-  utilizationRate: string;
+  utilizationRate?: string;
 }
 
 export interface MarketDetail {
@@ -138,9 +139,38 @@ export interface Reimbursement {
   amount: string;
   txHash: string | null;
   status: string;
+  createdAt: string;
 }
 
 export interface ReimbursementsResponse {
   reimbursements: Reimbursement[];
   total: number;
+}
+
+// Analytics types
+export interface AnalyticsReimbursements {
+  data: { date: string; amountUsd: string; count: number }[];
+}
+
+export interface AnalyticsEfficiency {
+  medianMinutes: number;
+  p95Minutes: number;
+  sampleSize: number;
+}
+
+export interface ExcessInterestMarket {
+  marketId: string;
+  marketName: string;
+  totalExcessUsd: string;
+  avgActualApr: string;
+  capApr: string;
+  aboveCapPct: string;
+}
+
+export interface BorrowVolumeSeries {
+  series: {
+    marketId: string;
+    marketName: string;
+    data: { date: string; totalBorrowedUsd: string }[];
+  }[];
 }

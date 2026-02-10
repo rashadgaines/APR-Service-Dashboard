@@ -262,16 +262,24 @@ function refreshCacheIfNeeded() {
  * GET /api/metrics/overview
  * Returns system-wide metrics for the dashboard (cached)
  */
-router.get('/overview', asyncHandler(async (_req: Request, res: Response) => {
+router.get('/overview', asyncHandler(async (req: Request, res: Response) => {
   try {
+    // Force bypass cache if requested
+    if (req.query.force === '1') {
+      const overview = await computeOverviewMetrics();
+      metricsCache.overview = overview;
+      metricsCache.lastUpdate = Date.now();
+      return res.json(overview);
+    }
+
     // Refresh cache in background if needed
     refreshCacheIfNeeded();
-    
+
     // Return cached data immediately
     if (metricsCache.overview) {
       return res.json(metricsCache.overview);
     }
-    
+
     // On first request, compute immediately
     const overview = await computeOverviewMetrics();
     metricsCache.overview = overview;
@@ -298,14 +306,22 @@ router.get('/overview', asyncHandler(async (_req: Request, res: Response) => {
  */
 router.get('/daily', asyncHandler(async (req: Request, res: Response) => {
   try {
+    // Force bypass cache if requested
+    if (req.query.force === '1') {
+      const daily = await computeDailyMetrics();
+      metricsCache.daily = daily;
+      metricsCache.lastUpdate = Date.now();
+      return res.json(daily);
+    }
+
     // Refresh cache in background if needed
     refreshCacheIfNeeded();
-    
+
     // Return cached data immediately
     if (metricsCache.daily) {
       return res.json(metricsCache.daily);
     }
-    
+
     // On first request, compute immediately
     const daily = await computeDailyMetrics();
     metricsCache.daily = daily;
@@ -324,16 +340,24 @@ router.get('/daily', asyncHandler(async (req: Request, res: Response) => {
  * GET /api/metrics/markets
  * Returns market-level metrics (cached)
  */
-router.get('/markets', asyncHandler(async (_req: Request, res: Response) => {
+router.get('/markets', asyncHandler(async (req: Request, res: Response) => {
   try {
+    // Force bypass cache if requested
+    if (req.query.force === '1') {
+      const markets = await computeMarketMetrics();
+      metricsCache.markets = markets;
+      metricsCache.lastUpdate = Date.now();
+      return res.json(markets);
+    }
+
     // Refresh cache in background if needed
     refreshCacheIfNeeded();
-    
+
     // Return cached data immediately
     if (metricsCache.markets) {
       return res.json(metricsCache.markets);
     }
-    
+
     // On first request, compute immediately
     const markets = await computeMarketMetrics();
     metricsCache.markets = markets;

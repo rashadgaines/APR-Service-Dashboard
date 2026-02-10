@@ -4,6 +4,7 @@ import { processDailyAccrual } from '@/services/interest/accrual';
 import { processReimbursements } from './processor';
 import { logger } from '@/utils/logger';
 import { JOB_INTERVALS } from '@/config/constants';
+import { broadcast } from '@/services/websocket';
 
 // Job status tracking
 interface JobStatus {
@@ -34,6 +35,12 @@ export function startScheduler(): void {
       } else {
         logger.info(`Position sync completed successfully: ${result.positionsCreated} created, ${result.positionsUpdated} updated`);
       }
+
+      broadcast('positions_synced', {
+        marketsProcessed: result.marketsProcessed,
+        positionsCreated: result.positionsCreated,
+        positionsUpdated: result.positionsUpdated,
+      });
     }
   );
 
@@ -66,6 +73,11 @@ export function startScheduler(): void {
       } else {
         logger.info(`Daily reimbursement completed: ${result.borrowersProcessed} borrowers processed, ${result.transactionsCreated} transactions`);
       }
+
+      broadcast('reimbursements_executed', {
+        borrowersProcessed: result.borrowersProcessed,
+        transactionsCreated: result.transactionsCreated,
+      });
     }
   );
 

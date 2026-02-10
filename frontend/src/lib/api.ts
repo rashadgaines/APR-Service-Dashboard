@@ -190,6 +190,36 @@ class ApiClient {
   async getReimbursementSummary<T = unknown>(days = 30): Promise<T> {
     return this.request<T>(`/reimbursements/summary?days=${days}`);
   }
+
+  // Force-refetch variants (bypass backend cache)
+  async getOverviewForce<T = unknown>(): Promise<T> {
+    return this.request<T>('/metrics/overview?force=1');
+  }
+
+  async getDailyMetricsForce<T = unknown>(days = 30): Promise<T> {
+    return this.request<T>(`/metrics/daily?days=${days}&force=1`);
+  }
+
+  async getMarketMetricsForce<T = unknown>(): Promise<T> {
+    return this.request<T>('/metrics/markets?force=1');
+  }
+
+  // Analytics endpoints
+  async getAnalyticsReimbursements<T = unknown>(days = 30): Promise<T> {
+    return this.request<T>(`/analytics/reimbursements?days=${days}`);
+  }
+
+  async getAnalyticsEfficiency<T = unknown>(days = 30): Promise<T> {
+    return this.request<T>(`/analytics/efficiency?days=${days}`);
+  }
+
+  async getExcessInterest<T = unknown>(days = 30): Promise<T> {
+    return this.request<T>(`/analytics/excess-interest?days=${days}`);
+  }
+
+  async getBorrowVolume<T = unknown>(days = 30): Promise<T> {
+    return this.request<T>(`/analytics/borrow-volume?days=${days}`);
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

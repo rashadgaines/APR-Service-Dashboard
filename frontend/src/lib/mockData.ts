@@ -1,4 +1,4 @@
-import type { AlertsResponse, DailyReimbursementData, MarketMetrics, MetricsOverview, Market, Alert, Reimbursement } from '@/types';
+import type { AlertsResponse, DailyReimbursementData, MarketMetrics, MetricsOverview, Market, Alert, Reimbursement, AnalyticsEfficiency, ExcessInterestMarket } from '@/types';
 
 const today = new Date();
 
@@ -173,15 +173,19 @@ const mockAlertHistory: Alert[] = [
 const mockReimbursements: Reimbursement[] = Array.from({ length: 25 }).map((_, idx) => {
   const market = mockMarkets[idx % mockMarkets.length];
   const amount = 150 + (idx % 6) * 75 + (idx % 3) * 22;
+  const accrualDate = daysAgo(idx);
+  // createdAt is 1-3 hours after the accrual date (processing delay)
+  const processedAt = new Date(accrualDate.getTime() + ((idx % 3) + 1) * 3600000);
   return {
     id: `reim-${idx + 1}`,
     positionId: `pos-${idx + 100}`,
     borrowerAddress: `0x${(idx + 10).toString().padStart(40, '0')}`,
     marketName: market.name,
-    date: daysAgo(idx % 12).toISOString(),
+    date: accrualDate.toISOString(),
     amount: amount.toFixed(2),
     txHash: idx % 5 === 0 ? null : `0x${(idx + 1000).toString(16).padStart(64, '0')}`,
     status: idx % 7 === 0 ? 'failed' : idx % 4 === 0 ? 'pending' : 'processed',
+    createdAt: processedAt.toISOString(),
   };
 });
 
@@ -228,6 +232,59 @@ function buildMarketDetail(marketId: string) {
   };
 }
 
+// Analytics mock data
+const mockAnalyticsReimbursements = {
+  data: Array.from({ length: 30 }).map((_, i) => ({
+    date: formatDate(daysAgo(29 - i)),
+    amountUsd: (5000 + Math.sin(i / 3) * 2000 + Math.random() * 1000).toFixed(2),
+    count: Math.max(1, Math.round(3 + Math.sin(i / 4) * 2)),
+  })),
+};
+
+const mockAnalyticsEfficiency: AnalyticsEfficiency = {
+  medianMinutes: 1440,
+  p95Minutes: 2880,
+  sampleSize: 156,
+};
+
+const mockExcessInterest: ExcessInterestMarket[] = [
+  {
+    marketId: 'market-wsteth-weth',
+    marketName: 'wstETH/WETH',
+    totalExcessUsd: '12450.00',
+    avgActualApr: '0.1120',
+    capApr: '0.0800',
+    aboveCapPct: '40.00',
+  },
+  {
+    marketId: 'market-wbtc-usdc',
+    marketName: 'WBTC/USDC',
+    totalExcessUsd: '4230.00',
+    avgActualApr: '0.1050',
+    capApr: '0.1000',
+    aboveCapPct: '5.00',
+  },
+  {
+    marketId: 'market-wpol-usdc',
+    marketName: 'WPOL/USDC',
+    totalExcessUsd: '890.00',
+    avgActualApr: '0.1180',
+    capApr: '0.1200',
+    aboveCapPct: '-1.67',
+  },
+];
+
+const mockBorrowVolume = {
+  series: mockMarkets.map(m => ({
+    marketId: m.id,
+    marketName: m.name,
+    data: Array.from({ length: 30 }).map((_, i) => ({
+      date: formatDate(daysAgo(29 - i)),
+      totalBorrowedUsd: (parseFloat(m.totalBorrowed) * (0.9 + Math.random() * 0.2)).toFixed(2),
+    })),
+  })),
+};
+
 export function getMockResponse(endpoint: string) {
   if (endpoint.startsWith('/metrics/overview')) return mockOverview;
   if (endpoint.startsWith('/metrics/daily')) return buildDaily();
@@ -250,6 +307,10 @@ export function getMockResponse(endpoint: string) {
     };
   }
   if (endpoint.startsWith('/alerts')) return mockAlerts;
+  if (endpoint.startsWith('/analytics/reimbursements')) return mockAnalyticsReimbursements;
+  if (endpoint.startsWith('/analytics/efficiency')) return mockAnalyticsEfficiency;
+  if (endpoint.startsWith('/analytics/excess-interest')) return mockExcessInterest;
+  if (endpoint.startsWith('/analytics/borrow-volume')) return mockBorrowVolume;
   if (endpoint.startsWith('/reimbursements')) return { reimbursements: mockReimbursements };
 
   return null;

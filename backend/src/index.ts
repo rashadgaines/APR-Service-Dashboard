@@ -7,6 +7,7 @@ import { startScheduler } from '@/services/reimbursement/scheduler';
 import { logger } from '@/utils/logger';
 import { errorHandler } from '@/api/middleware/error';
 import { initializeWallet, isWalletReady, getSignerAddress } from '@/services/blockchain';
+import { initWebSocket } from '@/services/websocket';
 
 // Import routes
 import metricsRoutes from '@/api/routes/metrics';
@@ -16,6 +17,7 @@ import alertRoutes from '@/api/routes/alerts';
 import reimbursementRoutes from '@/api/routes/reimbursements';
 import jobsRoutes from '@/api/routes/jobs';
 import healthRoutes from '@/api/routes/health';
+import analyticsRoutes from '@/api/routes/analytics';
 
 const app = express();
 
@@ -66,6 +68,7 @@ app.use('/api/alerts', alertRoutes);
 app.use('/api/reimbursements', reimbursementRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -99,6 +102,9 @@ const server = app.listen(API_CONFIG.PORT, () => {
   logger.info(`📊 Environment: ${env.NODE_ENV}`);
   logger.info(`🔗 CORS Origins: ${API_CONFIG.CORS_ORIGINS.join(', ')}`);
 });
+
+// Initialize WebSocket server
+initWebSocket(server);
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
