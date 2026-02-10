@@ -127,15 +127,16 @@ export function ReimbursementChart({ data, canvasId = "reimbursementChart" }: Re
   }, [data, canvasId]);
 
   return (
-    <Card className="w-full h-full bg-muted rounded-3xl shadow-sm border-0">
-      <CardHeader className="pb-0 pt-6 px-8 bg-transparent">
-        <CardTitle className="text-xl font-serif font-semibold text-foreground/80">Daily Reimbursements</CardTitle>
+    <Card className="h-full border border-border/50">
+      <CardHeader className="pt-6 px-6 pb-2">
+        <CardTitle className="font-serif text-xl">Daily Reimbursements</CardTitle>
+        <p className="text-[10px] font-sans font-bold uppercase tracking-widest text-muted-foreground/60 mt-1">
+          Last 7 days
+        </p>
       </CardHeader>
-      <CardContent className="p-0 px-8 pb-8 flex flex-col items-center justify-center h-[350px]">
-        <div className="w-full h-full flex items-center justify-center">
-          <div className="w-full h-[280px] flex items-center justify-center">
-            <canvas id={canvasId} className="w-full h-full" aria-label="Daily Reimbursements Bar Chart" role="img" />
-          </div>
+      <CardContent className="p-6">
+        <div className="h-72">
+          <canvas id={canvasId} className="w-full h-full" aria-label="Daily Reimbursements Bar Chart" role="img" />
         </div>
       </CardContent>
     </Card>
